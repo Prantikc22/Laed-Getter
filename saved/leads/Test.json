@@ -1,0 +1,26 @@
+{
+  "metadata": {
+    "saved_at": "2024-11-29T16:27:17.386901",
+    "category": "business",
+    "count": 1
+  },
+  "leads": [
+    {
+      "address": "81, Debinibas Rd, Ward Number 22, Motijheel, Dum Dum Motijheel, Dum Dum, Kolkata, West Bengal 700074, India",
+      "business_name": "Dum Dum Kishore Bharati Primary School",
+      "distance": 1640.56,
+      "google_maps_url": "https://www.google.com/maps/place/?q=place_id:ChIJrwRaEwWe-DkRfk6MIT6nN0I",
+      "opening_hours": [
+        "Monday: 6:00\u202fAM\u2009\u2013\u200910:00\u202fPM",
+        "Tuesday: 6:00\u202fAM\u2009\u2013\u200910:00\u202fPM",
+        "Wednesday: 6:00\u202fAM\u2009\u2013\u200910:00\u202fPM",
+        "Thursday: 6:00\u202fAM\u2009\u2013\u200910:00\u202fPM",
+        "Friday: 6:00\u202fAM\u2009\u2013\u200910:00\u202fPM",
+        "Saturday: 6:00\u202fAM\u2009\u2013\u200910:00\u202fPM",
+        "Sunday: Closed"
+      ],
+      "phone": "",
+      "website": ""
+    }
+  ]
+}
