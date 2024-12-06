@@ -706,44 +706,37 @@ def save_leads():
         logging.error(f"Error in save_leads: {str(e)}")
         return jsonify({'error': str(e)}), 500
 
-@app.route('/api/search', methods=['POST'])
+@app.route('/api/search', methods=['GET'])
 @cross_origin()
 def search():
     try:
-        data = request.json
-        search_term = data.get('searchTerm', '')
-        location = data.get('location', '')
-        radius = data.get('radius', 3000)  # Default 3km
-        exact_match = data.get('exactMatch', False)
-        page_token = data.get('pageToken', None)  # For pagination
+        search_term = request.args.get('query', '')
+        locations = json.loads(request.args.get('locations', '[]'))
+        radius = int(request.args.get('radius', 3000))  # Default 3km
+        exact_pincode_search = request.args.get('exactPincodeSearch', 'false').lower() == 'true'
         
-        if not search_term or not location:
-            return jsonify({"error": "Search term and location are required"}), 400
+        if not search_term or not locations:
+            return jsonify({"error": "Search term and locations are required"}), 400
 
-        # Check if location is a pincode
-        is_pincode = location.isdigit() and len(location) == 6
-
-        # Initialize Google Maps client
+        results = []
         gmaps = googlemaps.Client(key=os.getenv('GOOGLE_MAPS_API_KEY'))
         
-        # Get location coordinates
-        geocode_result = gmaps.geocode(location)
-        if not geocode_result:
-            return jsonify({"error": "Location not found"}), 404
+        for location in locations:
+            # Get location coordinates
+            geocode_result = gmaps.geocode(location)
+            if not geocode_result:
+                continue
+                
+            lat = geocode_result[0]['geometry']['location']['lat']
+            lng = geocode_result[0]['geometry']['location']['lng']
             
-        lat = geocode_result[0]['geometry']['location']['lat']
-        lng = geocode_result[0]['geometry']['location']['lng']
-        
-        # Search for places
-        try:
+            # Search for places
             places_result = gmaps.places_nearby(
                 location=(lat, lng),
                 radius=radius,
-                keyword=search_term,
-                page_token=page_token
+                keyword=search_term
             )
             
-            results = []
             seen_places = set()
             
             # Process results
@@ -765,46 +758,45 @@ def search():
                         place_lat = place_details['geometry']['location']['lat']
                         place_lng = place_details['geometry']['location']['lng']
                         
-                        # Calculate distance
-                        distance = calculate_distance(lat, lng, place_lat, place_lng)
+                        # Calculate distance in kilometers
+                        distance = round(calculate_distance(lat, lng, place_lat, place_lng) / 1000, 2)
                         
                         result = {
                             'business_name': place_details.get('name', ''),
                             'address': place_details.get('formatted_address', ''),
                             'phone': place_details.get('formatted_phone_number', ''),
                             'website': place_details.get('website', ''),
-                            'distance': round(distance, 2),
+                            'distance': distance,
                             'google_maps_url': f"https://www.google.com/maps/place/?q=place_id:{place_id}",
                             'opening_hours': place_details.get('opening_hours', {}).get('weekday_text', [])
                         }
                         
-                        # Only add if exact match is off or if pincode matches
-                        if not exact_match or not is_pincode:
+                        # Extract postal code from address
+                        postal_code = get_pincode_from_address(result['address'])
+                        if postal_code:
+                            result['postal_code'] = postal_code
+                        
+                        # Only add if exact pincode search is off or if pincode matches
+                        if not exact_pincode_search:
                             results.append(result)
-                        else:
-                            # For exact match with pincode, check if pincode exists in address
-                            address = result['address']
-                            if location in address:
-                                results.append(result)
+                        elif postal_code and location == postal_code:
+                            results.append(result)
                         
                     except Exception as place_error:
                         logging.error(f"Error processing place: {str(place_error)}")
                         continue
-            
-            response = {
-                'results': results,
-                'next_page_token': places_result.get('next_page_token', None)
-            }
-            
-            return jsonify(response)
-            
-        except Exception as search_error:
-            logging.error(f"Error in place search: {str(search_error)}")
-            return jsonify({"error": "Error searching places"}), 500
-            
+        
+        # Sort results by distance
+        results.sort(key=lambda x: x['distance'])
+        
+        return jsonify({
+            'results': results,
+            'next_page_token': None  # We'll implement pagination later if needed
+        })
+        
     except Exception as e:
-        logging.error(f"Error in search endpoint: {str(e)}")
-        return jsonify({"error": str(e)}), 500
+        logging.error(f"Error in search: {str(e)}")
+        return jsonify({'error': str(e)}), 500
 
 @app.route('/api/find-email', methods=['POST'])
 @cross_origin()
@@ -1006,6 +998,28 @@ def delete_saved_list(list_id):
             return jsonify({'error': 'List not found'}), 404
         
     except Exception as e:
+        return jsonify({'error': str(e)}), 500
+
+@app.route('/api/lists', methods=['GET'])
+@cross_origin()
+def get_lists():
+    try:
+        # Create the directory if it doesn't exist
+        os.makedirs('saved_lists', exist_ok=True)
+        
+        lists = []
+        # List all JSON files in the saved_lists directory
+        for filename in os.listdir('saved_lists'):
+            if filename.endswith('.json'):
+                list_id = filename[:-5]  # Remove .json extension
+                lists.append({
+                    'id': list_id,
+                    'name': list_id.replace('_', ' ').title()
+                })
+        
+        return jsonify(lists)
+    except Exception as e:
+        logging.error(f"Error getting lists: {str(e)}")
         return jsonify({'error': str(e)}), 500
 
 # WhatsApp configuration storage
